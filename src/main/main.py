@@ -1,13 +1,12 @@
 import asyncio
 
-from youtube_client.youtube_client import VideoDownloader
+from config.bot_config import bot, dp
+from config.logger_config import logger
 
 
 async def main():
-    url = 'https://www.youtube.com/watch?v=BLUVshRTqwo'
-    downloader = VideoDownloader('/home/slendycs/Загрузки')
-    path = await downloader.download_video(url)
-    print(path)
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 
 if __name__ == '__main__':
