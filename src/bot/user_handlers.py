@@ -28,6 +28,7 @@ async def handle_link(message: Message, state: FSMContext):
         # Получаем доступные потоки видео
         streams = await yt.streams()
         await message.answer(text=answer, reply_markup=streams_kb(streams))
+        
     except (VideoUnavailable, RegexMatchError) as e:
         await message.answer(invalid_link_message)
         logger.warning(e)
