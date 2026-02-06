@@ -1,34 +1,43 @@
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
-from pytubefix import AsyncYouTube
-from pytubefix.exceptions import VideoUnavailable, RegexMatchError
 
-from utils.string_utils import format_time_from_seconds
-from config.logger_config import logger
 from config.fsm_config import UserStates
-from localization.messages_localization import (invalid_link_message,
-                                                video_preview_message)
 from bot.keyboards import streams_kb
+from downloader.downloader import Downloader
+from localization.messages_localization import video_preview_message
+from localization.errors_localization import (no_info_err, 
+                                              invalid_link_err,
+                                              no_streams_err)
+
 
 # Устанавливаем роутер
 user_router = Router()
 
 # Обработка получения ссылки на видео
 @user_router.message(UserStates.link_waiting, F.text != None)
-async def handle_link(message: Message, state: FSMContext):
-    try:
-        yt = AsyncYouTube(url=message.text, use_oauth=True, allow_oauth_cache=True)
+async def handle_link(message: Message, state: FSMContext) -> None:
+    video = Downloader(url=message.text) # type: ignore
+    if video.video == None:
+        await message.answer(invalid_link_err)
+        return
+    
+    # Получаем информацию о видео
+    video_info = await video.get_video_info()
+    if video_info == None:
+        await message.answer(no_info_err)
+        return
+    
+    # Форматируем сообщение с информацией о видео
+    answer = video_preview_message.format(video_info['title'],
+                                          video_info['author'],
+                                          video_info['duration'])
+    # Строим клавиатуру
+    keyboard = await streams_kb(video)
+    if keyboard == None:
+        await message.answer(no_streams_err)
+          
+    # Отправляем информацию о видео
+    await message.answer(text=answer, reply_markup=keyboard)
+    await state.set_state(UserStates.resolution_choice)
 
-        # Получаем метаданные видео
-        video_duration = format_time_from_seconds(await yt.length())
-        answer = video_preview_message.format(await yt.title(),
-                                              await yt.author(),
-                                              video_duration)
-        # Получаем доступные потоки видео
-        streams = await yt.streams()
-        await message.answer(text=answer, reply_markup=streams_kb(streams))
-        
-    except (VideoUnavailable, RegexMatchError) as e:
-        await message.answer(invalid_link_message)
-        logger.warning(e)

@@ -1,6 +1,6 @@
 .env
 docker-compose.yml
-src/youtube_client/__pycache__
+src/downloader/__pycache__
 src/config/__pycache__
 src/localization/__pycache__
 src/bot/__pycache__
