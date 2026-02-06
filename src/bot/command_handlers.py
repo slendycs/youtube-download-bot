@@ -1,10 +1,10 @@
-from aiogram import F, Router
+from aiogram import Router
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from config.fsm_config import UserStates
-from localization.messages_localization import *
+from localization.messages_localization import start_message
 
 # Устанавливаем роутер
 command_router = Router()
