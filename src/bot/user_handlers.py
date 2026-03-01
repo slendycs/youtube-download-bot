@@ -45,9 +45,10 @@ async def handle_link(message:Message, state:FSMContext) -> None:
     await message.answer(text=answer, reply_markup=keyboard)
     await state.set_state(UserStates.resolution_choice)
 
+
 # Обработка результата нажатия кнопки выбора разрешения
 @user_router.callback_query(UserStates.resolution_choice, F.data.startswith('itag_'))
-async def handle_resolution_callback(call:CallbackQuery, state:FSMContext):
+async def handle_resolution_callback(call:CallbackQuery, state:FSMContext) -> None:
     # Получаем запрос от нажатия кнопки
     await call.answer()
     request = call.data
@@ -64,7 +65,11 @@ async def handle_resolution_callback(call:CallbackQuery, state:FSMContext):
     # Получаем видео по эти данным
     video_data = serialize_request(request)
     video = Downloader(video_id=video_data.get('video_id'))
+
+    # Скачиваем видео
     download_path = await video.download(int(video_data.get('itag')))
+
+    # Проверяем успешность загрузки
     if download_path != None:
         logger.info(f'Video was downloaded: {download_path}')
         await call.bot.edit_message_text(text=download_finished_message,
