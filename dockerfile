@@ -26,9 +26,11 @@ COPY src/ /app/src
 RUN chown -R ${APP_USER}:${APP_USER} /app/src && \
     chmod -R 755 /app/src
 
-# Папка для данных
-RUN mkdir -p /app/downloads && \
-    chmod 777 /app/downloads
+# Папки для данных
+RUN mkdir -p /app/downloads /app/temp && \
+    chown -R ${APP_USER}:${APP_USER} /app && \
+    chmod -R 755 /app && \
+    chmod 777 /app/downloads /app/temp
 
 # Переключение пользователя
 USER ${APP_USER}
