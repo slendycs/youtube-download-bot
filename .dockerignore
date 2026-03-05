@@ -1,0 +1,12 @@
+.env
+env.example
+.gitignore
+docker-compose.yml
+src/downloader/__pycache__
+src/config/__pycache__
+src/localization/__pycache__
+src/bot/__pycache__
+src/main/__pycache__
+src/utils/__pycache__
+/.venv
+/downloads

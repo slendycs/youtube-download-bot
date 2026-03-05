@@ -22,10 +22,10 @@ class Downloader:
             self.video = None
             logger.error(e)
 
-    def __get_download_path(self) -> str:
+    def __get_download_path(self, destination:str='downloads') -> str:
         current_path = Path(__file__).resolve()
         project_root = current_path.parents[2]
-        downloads_path = project_root.joinpath('downloads')
+        downloads_path = project_root.joinpath(destination)
         logger.debug(f'Downloads path: {downloads_path}')
         return str(downloads_path)
 
@@ -91,6 +91,7 @@ class Downloader:
         # Загружаем видео
         video_stream = await self.video.get_stream_by_itag(stream_itag)
         download_path = self.__get_download_path()
+        temp_path = self.__get_download_path('temp')
         
         # Проверяем нужно ли склеивать аудио и видео
         if video_stream.includes_audio_track == True:
@@ -99,12 +100,12 @@ class Downloader:
             return video_path
         else:
             logger.debug('Need to splice videos')
-            video_path = video_stream.download(download_path, "video_only")
+            video_path = video_stream.download(temp_path, "video_only")
             
             #Загружаем аудио
             audio_stream = await self.video.streams()
             audio_stream = audio_stream.filter(only_audio=True).first()
-            audio_path = audio_stream.download(download_path, "audio_only")
+            audio_path = audio_stream.download(temp_path, "audio_only")
           
             # Объединяем аудио и видео
             video = VideoFileClip(video_path)
@@ -113,7 +114,7 @@ class Downloader:
 
             # Записываем финальный резульат
             final_path = f'{download_path}/{video_title}.mp4'
-            final.write_videofile(final_path)
+            final.write_videofile(final_path, temp_audiofile_path=temp_path)
             os.remove(video_path)
             os.remove(audio_path)
             return final_path
