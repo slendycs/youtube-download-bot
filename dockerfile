@@ -8,13 +8,6 @@ ARG APP_GID=568
 RUN groupadd -g ${APP_GID} ${APP_USER} && \
     useradd -u ${APP_UID} -g ${APP_GID} -m ${APP_USER}
 
-# Системные зависимости
-RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends \
-        ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # Python зависимости
