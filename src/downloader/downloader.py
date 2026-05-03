@@ -1,9 +1,9 @@
 import os
+import ffmpeg
 from pytubefix import AsyncYouTube
 from pytubefix.exceptions import VideoUnavailable, RegexMatchError
 from pathlib import Path
-from moviepy import VideoFileClip
-from moviepy import AudioFileClip
+from urllib.error import HTTPError
 
 from config.logger_config import logger
 from utils.string_utils import format_time_from_seconds
@@ -28,6 +28,33 @@ class Downloader:
         downloads_path = project_root.joinpath(destination)
         logger.debug(f'Downloads path: {downloads_path}')
         return str(downloads_path)
+    
+    def __merge_audio_and_video(self, video_path:str, audio_path:str, output_path:str) -> str | None:
+        for p in (video_path, audio_path):
+            if not Path(p).exists():
+                raise FileNotFoundError(f"File not found: {p}")
+            
+        try:
+            video_stream = ffmpeg.input(video_path)
+            audio_stream = ffmpeg.input(audio_path)
+
+            out = ffmpeg.output(
+                video_stream.video,
+                audio_stream.audio,
+                output_path,
+                vcodec='copy',
+                acodec='aac',
+                **{'shortest': None} 
+            )
+
+            out.run(overwrite_output=True)
+            logger.info(f'Video was merged: {output_path}')
+            return output_path
+        except ffmpeg.Error as e:
+            err = e.stderr.decode('utf8', errors='ignore') if e.stderr else 'No logs'
+            logger.error(f'FFmpeg error: {err}')
+            return None
+
 
     async def get_streams_info(self) -> dict[str, str] | None:
         """
@@ -92,29 +119,37 @@ class Downloader:
         video_stream = await self.video.get_stream_by_itag(stream_itag)
         download_path = self.__get_download_path()
         temp_path = self.__get_download_path('temp')
+        final_path = f'{download_path}/{video_title}.mp4'
         
         # Проверяем нужно ли склеивать аудио и видео
-        if video_stream.includes_audio_track == True:
-            logger.debug('No need to splice videos')
-            video_path = video_stream.download(download_path, f'{video_title}.mp4')
-            return video_path
-        else:
-            logger.debug('Need to splice videos')
-            video_path = video_stream.download(temp_path, "video_only")
+        try:
+            if video_stream.includes_audio_track == True:
+                logger.debug('No need to splice videos')
+                video_path = video_stream.download(download_path, f'{video_title}.mp4')
+                return video_path
+            else:
+                logger.debug('Need to splice videos')
+                video_path = video_stream.download(temp_path, "video_only")
+                if video_path is None:
+                    logger.error('Error while downloading video stream')
+                    return None
+                
+                #Загружаем аудио
+                audio_stream = await self.video.streams()
+                audio_stream = audio_stream.filter(only_audio=True).first()
+                audio_path = audio_stream.download(temp_path, "audio_only")
+                if audio_path is None:
+                    logger.error('Error while downloading audio stream')
+                    return None
             
-            #Загружаем аудио
-            audio_stream = await self.video.streams()
-            audio_stream = audio_stream.filter(only_audio=True).first()
-            audio_path = audio_stream.download(temp_path, "audio_only")
-          
-            # Объединяем аудио и видео
-            video = VideoFileClip(video_path)
-            audio = AudioFileClip(audio_path)
-            final = video.with_audio(audio)
+                # Объединяем аудио и видео
+                final_path = self.__merge_audio_and_video(video_path, audio_path, final_path)
 
-            # Записываем финальный резульат
-            final_path = f'{download_path}/{video_title}.mp4'
-            final.write_videofile(final_path, temp_audiofile_path=temp_path)
-            os.remove(video_path)
-            os.remove(audio_path)
-            return final_path
+                # Удаляем временные файлы
+                os.remove(video_path)
+                os.remove(audio_path)
+
+                return final_path
+        except HTTPError as e:
+            logger.error(f'Some problem with request: {e}')
+            return None
